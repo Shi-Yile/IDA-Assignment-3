@@ -44,7 +44,7 @@ According to the work by [Buuren et al. 2011](https://www.jstatsoft.org/article/
 $$\lambda = \frac{B + \frac{B}{M}}{V^{MI}}$$
 We yield the following results with the standard MICE procedure - `mice()`, `with()` and `pool()`. Note that in step 2 (`with()`), we fit the normal linear regression of `bmi` over `age`, `hyp` and `cyl`. 
 
-As mentioned before, we look at the column `lambda` to get the proportion of variance due to missing data for each parameter (3 digits, seed = 1):
+As mentioned before, we look at the column `lambda` to get the proportion of variance due to missing data for each parameter (3 decimal places, seed = 1):
 
 \begin{enumerate}
   \item $\lambda_{age} = 0.686$
@@ -74,7 +74,7 @@ We repeat same analysis on $\lambda$ by using different random seeds from $2$ to
 
 We can observe that the conclusions in 1.(b) do not remain the same for different seeds. The values of $\lambda$ and the parameter most affected by the non-response vary dramatically.
 
-For seed $2$, $3$ and $6$, `age` has the largest value of $\lambda$ ($0.403$, $0.590$, $0.655$ of each, 3 digits) and is considered to be most affected by the non-response, which is consistent with conclusions in 1.(b), using random seed $1$. On the other hand, `chl` and `hyp` take the largest proportion of variance for seed $4$ and $5$ respectively, with values $0.331$ and $0.594$ of each. 
+For seed $2$, $3$ and $6$, `age` has the largest value of $\lambda$ ($0.403$, $0.590$, $0.655$ of each, 3 decimal places) and is considered to be most affected by the non-response, which is consistent with conclusions in 1.(b), using random seed $1$. On the other hand, `chl` and `hyp` take the largest proportion of variance for seed $4$ and $5$ respectively, with values $0.331$ and $0.594$ of each. 
 
 Recall that the larger amount of missing data, the larger the variability of values of $\lambda$ will be. Since nearly half ($48\%$) of cases in the dataset are incomplete, it is reasonable to have different conclusions every time we adjust the random seed.
 
@@ -230,7 +230,7 @@ Therefore, the equations above prove that two strategies are mathematically equi
 
 We need to prevent $x_2$ to be imputed and only impute $y$ and $x_1$ variables in step $1$. To this end, we pre-define the predictor matrix where the row for $x_2$ are all $0$s so that $x_2$ will not be imputed. Then we apply MICE on the dataset and consider the interaction term $x_1x_2$ in `with()` procedure. 
 
-According to the `pool()` procedure, we obtain the estimates and $95\%$ confidence intervals of $\beta_1$, $\beta_2$ and $\beta_3$ as follows (3 digits):
+According to the `pool()` procedure, we obtain the estimates and $95\%$ confidence intervals of $\beta_1$, $\beta_2$ and $\beta_3$ as follows (3 decimal places):
 \begin{enumerate}
   \item $\hat{\beta_1} = 1.411\ \ 95\%CI = (1.219, 1.603)$
   \item $\hat{\beta_2} = 1.966\ \ 95\%CI = (1.861, 2.071)$
@@ -266,6 +266,27 @@ summary(pool.q4a, conf.int = TRUE)[, c("term", "estimate", "2.5 %", "97.5 %")]
 
 ### (b) - Solution
 
+Now we consider using \emph{passive imputation} to impute the missing values in the interaction variable $x_1x_2$. 
+
+Since the original dataset does not contain the column for interaction variable, we calculate and add the interaction column into the dataset. Note that if $x_1 = NA$, the corresponding $x_1x_2 = NA$ too.
+
+To apply \emph{passive imputation}, we change the `method` argument for $x_1x_2$ so that its imputation method is the interaction of $x_1$ and $x_2$, i.e. $\sim I(x1*x2)$, in the `mice()` procedure. Moreover, we make some restrictions to the predictor matrix such that $y$ is not used to impute $x_1x_2$ and $x_1x_2$ is not considered when imputing $x_1$ and $x_2$. 
+
+With everything ready, we implement multiple imputation on the dataset with pre-defined method and predictor matrix and obtain the estimates of each parameter with their 
+$95\%$ confidence intervals.
+
+\begin{enumerate}
+  \item $\hat{\beta_1} = 1.193\ \ 95\%CI = (1.003, 1.382)$
+  \item $\hat{\beta_2} = 1.996\ \ 95\%CI = (1.899, 2.094)$
+  \item $\hat{\beta_3} = 0.874\ \ 95\%CI = (0.762, 0.987)$
+\end{enumerate}
+
+Comparing with \emph{impute and then transform} method, we obtain a more accurate estimate for $\beta_2$, with a narrower $95\%$ confidence interval including the true value, indicating higher accuracy of \emph{passive imputation}.
+
+The estimates for $\beta_1$ and $\beta_3$ are also closer to the ground truth values, proving the improved estimation accuracy. However, the problem that the corresponding confidence intervals do not cover the true values of two parameters still arises.
+
+Thus, we consider that the bias caused by the model is reduce by \emph{passive imputation} but still remains. 
+
 ```{r}
 # calculate interaction variable and add to dataset
 dataex4$x1x2 <- dataex4$x1 * dataex4$x2
@@ -300,12 +321,16 @@ summary(pool.q4b, conf.int = TRUE)[, c("term", "estimate", "2.5 %", "97.5 %")]
 In this case, we consider the interaction variable $x_1x_2$ as \emph{just another variable}, meaning that we impute the missing values in $x_1x_2$ without depending on the missing values in $x_1$ variable. Thus, we directly construct the linear regression over 
 $x_1$, $x_2$ and $x_1x_2$ in `with()` procedure, without any further steps.
 
-As a result, we obtain the following estimates and $95\%$ confidence intervals of $\beta_1$, $\beta_2$ and $\beta_3$ (3 digits):
+As a result, we obtain the following estimates and $95\%$ confidence intervals of $\beta_1$, $\beta_2$ and $\beta_3$ (3 decimal places):
 \begin{enumerate}
   \item $\hat{\beta_1} = 1.000\ \ 95\%CI = (0.841, 1.166)$
   \item $\hat{\beta_2} = 2.026\ \ 95\%CI = (1.940, 2.113)$
   \item $\hat{\beta_3} = 1.018\ \ 95\%CI = (0.930, 1.105)$
 \end{enumerate}
+
+We observe that the method treating the interaction $x_1x_2$ as \emph{just another variable} derives more accurate estimates for each parameter. Moreover, this method significantly improves the problem of model bias as the true value of each parameters are covered in its corresponding confidence interval. 
+
+In terms of the data and model in our problem, we regard \emph{just another variable} method as the best performed imputation method among $3$ candidates. However, we need to point out that this method leads to the inconsistency of imputed values as we consider the interaction term independent with missing values in other variables when imputing.
 
 ```{r}
 # consider x1x2 just as another variable
@@ -320,7 +345,9 @@ summary(pool.q4c, conf.int = TRUE)[, c("term", "estimate", "2.5 %", "97.5 %")]
 
 \newpage
 
-### (d) - SOlution
+### (d) - Solution
+
+As mentioned in 4.(c), though \emph{just another variable} approach obtains unbiased estimates for each parameter in the linear regression, the inner dependence between the interaction term $x_1x_2$ and $x_1$ is violated. In other words, we impute the missing values of $x_1x_2$ independently from $x_1$, without considering the deterministic relationship between them.
 
 \newpage
 
