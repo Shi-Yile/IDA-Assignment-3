@@ -10,6 +10,13 @@ knitr::opts_chunk$set(echo = TRUE)
 Sys.setlocale("LC_ALL", "UK")
 library(tidyverse)
 library(mice)
+library(JointAI)
+library(corrplot)
+library(devtools)
+library(reshape2)
+library(RColorBrewer)
+library(ggplot2)
+source_url("https://gist.githubusercontent.com/NErler/0d00375da460dd33839b98faeee2fdab/raw/c6f537ecf80eddcefd94992ec7926aa57d454536/propplot.R")
 ```
 
 ## Question 1
@@ -353,7 +360,162 @@ As mentioned in 4.(c), though \emph{just another variable} approach obtains unbi
 
 ## Question 5
 
-Solution
+### Solution
+
+***Exploratory Data Analysis***
+
+We start our study with inspecting our data. Our dataset consists of $500$ cases with $12$ variables including $8$ continuous variables and $4$ factors:
+\begin{itemize}
+  \item \texttt{wgt:} weight in kg
+  \item \texttt{gender:} male vs female
+  \item \texttt{bili:} bilirubin concentration in mg/dL
+  \item \texttt{age:} in years
+  \item \texttt{chol:} total serum cholesterol in mg/dL,
+  \item \texttt{HDL:} High-density lipoprotein cholesterol in mg/dL,
+  \item \texttt{hgt:} height in metres,
+  \item \texttt{educ:} educational status; $5$ ordered categories,
+  \item \texttt{race:} $5$ unordered categories,
+  \item \texttt{SBP:} systolic blood pressure in mmHg,
+  \item \texttt{hypten:} hypertensive status; binary,
+  \item \texttt{WC:} waist circumference in cm
+\end{itemize}
+
+According to the results from `summary()` function, variables `bili`, `chol`, `HDL`, `hgt`, `educ`, `SBP`, `hypten` and `WC` contains missing values. Note that some missing values in the dataset are presented by the string "NaN" rather than `NA`. Since we are going to use `mice` package for multiple imputation, which expects missing values coded as `NA`, we convert "NaN" to `NA` before any further steps, also for the consistency of notations. 
+
+We investigate the missing data patterns intuitively using `md_pattern()` function from `JointAI` package. We can observe that the number of missing values for each variable is not large ($47$ for `bili` at most and $1$ for `educ` at least) and the number of fully observed cases is $411$ (out of $500$). (We'll revisit this fact later when determining the number of imputed datasets, $m$)
+
+Moreover, we visualize the correlations between variables using `corrplot()` function from `corrplot` package. Recall that our model of interest is 
+$$ wgt = \beta_0 + \beta_1gender + \beta_2age + \beta_3hgt + \beta_4WC + \epsilon, \quad \epsilon \sim N(0, \sigma^2)$$
+According to the heat map below, we observe that there exists a strong positive correlation between the response variable `wgt` and `WC`. `gender` and `hgt` also have moderate correlations with `wgt`. However, the independent variable `age` shows a relatively low correlation with `wgt`, with a correlation efficient of $0.069$ ($3$ decimal places), which may lead to poor regression performance later. Another noteworthy fact is that `hgt` has a strong negative correlation with `gender`, which will be revisited later as it affects the imputation results of `hgt`.
+
+Finally, we explore the distribution of each variable by visualizing it with `plot_all()` function from `JointAI` package. Continuous variables, except `hgt`, appear to have right-skewed distributions. Thus, using normal distribution for imputation method probably results in poor approximations and we keep using predictive mean matching (pmm) as default. Since we consider `hgt` can be well approximated by normal distribution, the imputation method of it will be modified to `norm`, the normal linear stochastic regression imputation regarding the uncertainty of data. 
+
+```{r}
+# read dataset into R
+load("NHANES2.Rdata")
+
+# data structure and summary
+str(NHANES2)
+summary(NHANES2)
+```
+```{r}
+# convert NaN to NA
+NHANES2 <- na_if(NHANES2, "NaN")
+
+# transform factors to numeric
+col.factor <- which(sapply(NHANES2, is.factor))
+NHANES2.numeric <- NHANES2
+NHANES2.numeric[, col.factor] <- sapply(NHANES2[, col.factor], as.numeric)
+```
+
+```{r, fig.height = 5}
+# visualize missing pattern 
+mdp <- md_pattern(NHANES2, pattern = TRUE, color = c("blue", "red"))
+mdp$plot
+
+# correlation plots
+cor.NHANES2 <- cor(NHANES2.numeric, use = "complete.obs")
+corrplot(cor.NHANES2, method = "color", title = "Correlation plot",
+         tl.col = "black", diag = FALSE, type = "upper", mar = c(0, 0, 1, 0))
+
+# visualize the distribution of observed values in each variable
+par(mar = c(3, 3, 2, 1), mgp = c(2, 0.6, 0))
+plot_all(NHANES2, breaks = 30, ncol = 4)
+```
+***Multiple Imputation***
+
+
+
+```{r}
+# multiple imputation
+# dry mice() procedure 
+imp0 <- mice(data = NHANES2, maxit = 0)
+imp0
+
+# modify the imputation method of 'hgt'
+imp0$method["hgt"] <- "norm"
+```
+```{r}
+# MI for m = {5, 10, 20} with seed = {1, 2, 3}
+m.set <- c(5, 10, 15, 20, 25)
+seed.set <- c(1, 2, 3)
+
+for (i in m.set){
+  est.df <- NULL
+  for (j in seed.set){
+    time.start <- Sys.time()
+    imp.q5 <- mice(NHANES2, maxit = 20, m = i, seed = j, 
+                   method = imp0$method, printFlag = FALSE)
+    fit.q5 <- with(imp.q5, lm(wgt ~ gender + age + hgt + WC))
+    pool.q5 <- pool(fit.q5)
+    time.end <- Sys.time()
+    df <- data.frame(seed = j,
+                     genderfemale = pool.q5$pooled[2, "estimate"],
+                     age = pool.q5$pooled[3, "estimate"],
+                     hgt = pool.q5$pooled[4, "estimate"],
+                     WC = pool.q5$pooled[5, "estimate"],
+                     running.time = time.end - time.start)
+    est.df <- rbind(est.df, df)
+  }
+  cat("regression estimates (m = ", i, "): \n", sep = "")
+  print(est.df)
+}
+```
+```{r}
+# MI with m = 20 and seed = 1
+imp.q5 <- mice(NHANES2, maxit = 20, m = 20, seed = 1, 
+               method = imp0$method, printFlag = FALSE)
+fit.q5 <- with(imp.q5, lm(wgt ~ gender + age + hgt + WC))
+pool.q5 <- pool(fit.q5)
+```
+
+```{r, fig.height = 5}
+# necessary checks for mice() procedure 
+# problems check during mice() procedure
+imp.q5$loggedEvents
+# convergence check
+plot(imp.q5, layout = c(2, 8))
+```
+
+```{r, fig.height = 5}
+# distribution check
+# case for continuous variables
+bwplot(imp.q5)[c(2, 4, 5, 6, 7, 8)]
+densityplot(imp.q5)
+# distribution of hgt conditional on gender
+densityplot(imp.q5, ~ hgt | gender)
+```
+```{r, warning = FALSE, fig.height = 5}
+# case for categorised variables
+propplot(imp.q5)
+```
+```{r}
+# with() procedure (regression) check
+summary(fit.q5$analyses[[1]])
+par(mfrow = c(2, 2))
+plot(fit.q5$analyses[[1]])
+
+summary(fit.q5$analyses[[20]])
+par(mfrow = c(2, 2))
+plot(fit.q5$analyses[[20]])
+```
+```{r}
+# pool() procedure check
+pool.q5
+summary.q5 <- summary(pool.q5, conf.int = TRUE)
+summary.q5
+```
+```{r}
+df <- data.frame(estimate = summary.q5[, 2],
+                 lower = summary.q5[, 7],
+                 upper = summary.q5[, 8],
+                 p.value = summary.q5[, 6],
+                 row.names = c("$\\beta_0$", "$\\beta_1$",
+                               "$\\beta_2$", "$\\beta_3$", "$\\beta_4$"))
+colnames(df) <- c("estimate", "2.5% quantile", "97.5% quantile", "p-value")
+knitr::kable(df, escape = FALSE, digits = 3, 
+             caption = "Regression coefficients, 95% confidence intervals and p-values")
+```
 
 
 
