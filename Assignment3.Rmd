@@ -484,7 +484,7 @@ pool.q5 <- pool(fit.q5)
 
 After applying a multiple imputation with proper arguments to our data, we conduct necessary checks. 
 
-We first check if `mice()` found any problems during imputation with object `loggedEvents` and obtain the result `NULL`, indicating no problems detected. Furthermore, we check the Monte Carlo chains to ensure the convergence across all 12 variables. From the plots with $20$ MC chains for each variable, the there exists no obvious pattern among chains, suggesting good convergence for all variables. Note that the plot for the standard deviation of `educ` is blank as there is only $1$ missing values in this column.
+We first check if `mice()` found any problems during imputation with object `loggedEvents` and obtain the result `NULL`, indicating no problems detected. Furthermore, we check the Monte Carlo chains to ensure the convergence across all 12 variables. From the plots with $20$ MC chains for each variable, there exists no obvious pattern among well-mixing chains, suggesting good convergence for all variables. Note that the plot for the standard deviation of `educ` is blank as there is only $1$ missing values in this column.
 
 Next, we inspect if the distribution of the imputed values agree with the distribution of the observed values, using `densityplot()` as well as `bwplot() ` functions from `mice` package for continuous variables and [`propplot()` function](https://gist.githubusercontent.com/NErler/0d00375da460dd33839b98faeee2fdab/raw/c6f537ecf80eddcefd94992ec7926aa57d454536/propplot.R) for categorical variables.
 
@@ -494,7 +494,7 @@ Recall that we observed high correlation between `hgt` and `gender` from the hea
 the imputed datasets. Specifically, values in `male` group has much more
 narrow, concentrated distributions while the distribution in `female` group is wider.
 
-For categorical variables, the distribution of imputed values of `educ` appears to be abnormal simply because we only imputed $1$ value each time. The same reason can also explain the  discrepancies between the observed and imputed values for `hypten`.
+For categorical variables, the distribution of imputed values of `educ` appears to be abnormal simply because we only imputed quite a few values each time, specifically $1$. The similar reason can also explain the discrepancies between the observed and imputed values for `hypten`.
 
 ```{r, fig.height = 5}
 # necessary checks for mice() procedure 
@@ -521,15 +521,15 @@ propplot(imp.q5)
 
 ***Regression Check***
 
-Before we reach the final conclusions, we also need to check if our model of interest fits well the \emph{completed} data. Moreover, we check if model performances across different subsets are consistent. Thus, we display the regression summaries for both subset $1$ and $20$ with plots.
+We have confirmed that our imputation step is ssuccessful. Before we reach the final conclusions, we also need to check if our model of interest fits well the \emph{completed} data. Moreover, we check if model performances across different subsets are consistent. Thus, we display the regression summaries for both subset $1$ and $20$ with plots.
 
 According to the regression summaries, we observe that all independent variables, except `genderfemale` (`gender`), are significant with relatively low p-values. Moreover, $R^2$ around $85$ indicates good model explanation on response variable. Looking at the residual plots, we cannot observe obvious pattern of residuals, suggesting the linear assumption is met. The well-performed normal Q-Q plots shows the normality of error terms is satisfied. Thus, we consider our model to be well fitted.
 
-Note that the insignificance of `genderfemale` (`gender`) mainly because its high correlation with `hgt`. High correlation indicates there exists high collinearity between two variables, where one covers most information of the other. As a result, one variable becomes insignificant when including both of them into regression model. 
+The insignificance of `genderfemale` (`gender`) is also confirmed by implementing a multivariate Wald test. We fit another model without `gender` and compare the two models. The p-value of $0.1113$ indicates `gender` has no relevant contribution to the `wgt` model.
 
-The strong linear relationship between two variables influence not only the distribution of imputed values of `hgt`, but also the contribution to `wgt` of `gender`. Though the regression model appears to be good, we still need to focus on solving this problem in future research to improve model performance.
+Recall that there is a strong linear relationship between `gender` and `hgt`, which influences the distribution of imputed values of `hgt`. Here, we may also consider it as a reason for the insignificant contribution of `gender`. Though the regression model appears to be good, we still need to solve this problem in future research to improve model performance. A easy and reasonable way is to drop `gender` from the model.
 
-Finally we pool the regression results and report the estimates of regression coefficients with their $95\%$ confidence intervals and p-values.
+Since the results from different subsets are similar, we consider our models are consistent across subsets. Therefore, we finally pool the regression results and report the estimates of regression coefficients with their $95\%$ confidence intervals and p-values. As expected, the coefficient of `gender` is insignificant. Moreover, we report the pooled adjusted $R^2$, where the value of around $0.85$ indicates good model explanation.
 
 ```{r}
 # with() procedure (regression) check
@@ -542,12 +542,20 @@ par(mfrow = c(2, 2))
 plot(fit.q5$analyses[[20]])
 ```
 ```{r}
+# Wald test
+fit.q5.nogender <- with(imp.q5, lm(wgt ~ age + hgt + WC))
+D1(fit.q5, fit.q5.nogender)
+```
+
+```{r}
 # pool() procedure check
 pool.q5
 summary.q5 <- summary(pool.q5, conf.int = TRUE)
 summary.q5
 ```
+
 ```{r}
+# report regression coefficients and CIs with p-values
 df <- data.frame(estimate = summary.q5[, 2],
                  lower = summary.q5[, 7],
                  upper = summary.q5[, 8],
@@ -559,6 +567,10 @@ knitr::kable(df, escape = FALSE, digits = 3,
              caption = "Regression coefficients, 95% CIs and p-values")
 ```
 
+```{r}
+# pooled R^2
+pool.r.squared(pool.q5, adjusted = TRUE)
+```
 
 
 
