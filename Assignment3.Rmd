@@ -87,20 +87,18 @@ Recall that the larger amount of missing data, the larger the variability of val
 
 ```{r}
 # create a data frame to store the results from different seeds
-bmi.lambda <- data.frame(age = bmi.pool$pooled[2, 10],
+bmi.lambda <- data.frame(seed = 1, age = bmi.pool$pooled[2, 10],
                          hyp = bmi.pool$pooled[3, 10],
-                         chl = bmi.pool$pooled[4, 10],
-                         row.names = "seed.1")
+                         chl = bmi.pool$pooled[4, 10])
 
 # repeat analysis with different seeds
 for (i in seq(2, 6)){
   imp.list <- mice(nhanes, printFlag = FALSE, seed = i)
   bmi.fit <- with(imp.list, lm(bmi ~ age + hyp + chl))
   bmi.pool <- pool(bmi.fit)
-  df <- data.frame(age = bmi.pool$pooled[2, 10],
+  df <- data.frame(seed = i, age = bmi.pool$pooled[2, 10],
                    hyp = bmi.pool$pooled[3, 10],
-                   chl = bmi.pool$pooled[4, 10],
-                   row.names = paste("seed.", i, sep = ""))
+                   chl = bmi.pool$pooled[4, 10])
   bmi.lambda <- rbind(bmi.lambda, df)
 }
 bmi.lambda
@@ -114,7 +112,7 @@ From 1.(c), we observe that the parameter most affected by the non-response vari
 
 We keep using same random seeds from $1$ to $6$, but change the number of imputed datasets, $M$, from $5$ to $100$. Again, we obtain a data frame with values of $\lambda$ for each parameter with different random seed.
 
-Now we can find that `age` always takes the largest proportion of variance due to missing cases (largest value of $\lambda$) in $5$ of $6$ seeds. For seed $3$, the variable `chl` becomes the parameter which is affected by the non-response, with $\lambda = 0.328$. It appears that the conclusions become more consistent with $M = 100$, as we expected.
+Now we can find that `age` always takes the largest proportion of variance due to missing cases (largest value of $\lambda$) in $5$ of $6$ seeds. For seed $3$, `chl` becomes the parameter which is affected by the non-response, with $\lambda = 0.328$. It appears that the conclusions become more consistent with $M = 100$, as we expected.
 
 As far as I am concerned, I prefer the analyses with $M = 100$. 
 
@@ -131,16 +129,14 @@ Overall, I still consider $M = 100$ as a better choice as the dataset in this qu
 ```{r}
 # initialize the data frame
 bmi.lambda.100 <- NULL
-
 # repeat analysis with m = 100
 for (i in seq(1, 6)){
-  imp.list <- mice(nhanes, m = 100, printFlag = FALSE, seed = i)
+  imp.list <- mice(nhanes, m = 100, printFlag = FALSE, seed = i) 
   bmi.fit <- with(imp.list, lm(bmi ~ age + hyp + chl))
   bmi.pool <- pool(bmi.fit)
-  df <- data.frame(age = bmi.pool$pooled[2, 10],
+  df <- data.frame(seed = i, age = bmi.pool$pooled[2, 10],
                    hyp = bmi.pool$pooled[3, 10],
-                   chl = bmi.pool$pooled[4, 10],
-                   row.names = paste("seed.", i, sep = ""))
+                   chl = bmi.pool$pooled[4, 10])
   bmi.lambda.100 <- rbind(bmi.lambda.100, df)
 }
 bmi.lambda.100
@@ -277,7 +273,7 @@ Now we consider using \emph{passive imputation} to impute the missing values in 
 
 Since the original dataset does not contain the column for interaction variable, we calculate and add the interaction column into the dataset. Note that if $x_1 = NA$, the corresponding $x_1x_2 = NA$ too.
 
-To apply \emph{passive imputation}, we change the `method` argument for $x_1x_2$ so that its imputation method is the interaction of $x_1$ and $x_2$, i.e. $\sim I(x1*x2)$, in the `mice()` procedure. Moreover, we make some restrictions to the predictor matrix such that $y$ is not used to impute $x_1x_2$ and $x_1x_2$ is not considered when imputing $x_1$ and $x_2$. 
+To apply \emph{passive imputation}, we modify the `method` argument for $x_1x_2$ so that its imputation method is the interaction of $x_1$ and $x_2$, i.e. $\sim I(x1*x2)$, in `mice()` procedure. Moreover, we make restrictions to the predictor matrix such that $y$ is not used to impute $x_1x_2$ and $x_1x_2$ is not considered when imputing $x_1$ and $x_2$. 
 
 With everything ready, we implement multiple imputation on the dataset with pre-defined method and predictor matrix and obtain the estimates of each parameter with their 
 $95\%$ confidence intervals.
@@ -298,19 +294,16 @@ Thus, we consider that the bias caused by the model is reduce by \emph{passive i
 # calculate interaction variable and add to dataset
 dataex4$x1x2 <- dataex4$x1 * dataex4$x2
 
-# apply passive imputation
 # initial mice() to get the method
 imp.q4b.0 <- mice(dataex4, m = 50, seed = 1, printFlag = FALSE)
 # specify x1x2 is the interaction of x_1 and x_2
 imp.q4b.0$method['x1x2'] <- "~I(x1*x2)"
-
-# set corresponding row in predictor matrix to 0
 # x_1 and x_2 should not be imputed by x1x2
 imp.q4b.0$predictorMatrix[c("x1", "x2"), "x1x2"] <- 0 
 # x1x2 should not be imputed by y
 imp.q4b.0$predictorMatrix["x1x2", "y"] <- 0
 
-# MI
+# final MI 
 imp.q4b <- mice(dataex4, m = 50, seed = 1, printFlag = FALSE,
                 predictorMatrix = imp.q4b.0$predictorMatrix,
                 method = imp.q4b.0$method)         # mice() procedure
@@ -408,7 +401,7 @@ NHANES2.numeric <- NHANES2
 NHANES2.numeric[, col.factor] <- sapply(NHANES2[, col.factor], as.numeric)
 ```
 
-```{r, fig.height = 5}
+```{r, fig.height = 4}
 # visualize missing pattern 
 mdp <- md_pattern(NHANES2, pattern = TRUE, color = c("blue", "red"))
 mdp$plot
@@ -422,9 +415,21 @@ corrplot(cor.NHANES2, method = "color", title = "Correlation plot",
 par(mar = c(3, 3, 2, 1), mgp = c(2, 0.6, 0))
 plot_all(NHANES2, breaks = 30, ncol = 4)
 ```
+\newpage
+
 ***Multiple Imputation***
 
+We begin multiple imputation with a dry/set-up run of `mice()` procedure. From the imputation summary, we observe the default imputation method for continuous variables is `pmm`. As mentioned before, we modify this imputation method for `hgt` to `norm`. Moreover, since `hgt` represents the individual's height in metres, we need to restrict the support the it. Here, we set a reasonable range of `hgt` to $[0.5, 2.8]$.
 
+For factors, the methods are different depending on the number of classes in the factor. `logreg` is used for `hypten` as it is a binary variable, while `polr` is used for `educ` since this variable consists of multiple categories. 
+
+Before any further imputation checks, we determine a proper number of imputed datasets, i.e. `m` argument in `mice()` function, based on both accuracy and statistical efficiency. To this end, we run complete multiple imputation procedures including `mice()`, `with()` and `pool()` with a set of candidates of $\texttt{m} \in \{5, 10, 15, 20, 25\}$ and repeat the procedures for $\texttt{seed} \in  \{1, 2, 3, 4, 5, 6\}$. We report the estimates for the regression coefficients as well as the running time using different seed for each candidate of `m`. 
+
+As the data frames shown below, the variance of estimated regression coefficients gets smaller as `m` increases. However, this improvement becomes insignificant from $\texttt{m}=20$ to $\texttt{m}=25$. Meanwhile, we notice that the running time of each multiple imputation increases by around 10 seconds as the value of `m` increases by $5$ ($50$ seconds for $\texttt{m}=25). 
+
+Therefore, we prefer a multiple imputation on our dataset with $\texttt{m}=20$, which obtains both computationally efficient and robust to random variation due to seed choice. Meanwhile, we set `maxit` argument to $20$ and keep random seed as $1$ for model reproducibility, without the loss of generality.
+
+[\textbf{Note:} There is no doubt to use larger value of $m$ (e.g. $50$, $100$) to improve the model accuracy. However, in this case, the percentage of missing values in each variable is low ($9.4\%$ for `bili` at most) and over $80\%$ cases in the dataset are complete. Thus, we believe smaller $m$ can satisfy the requirements of both less variation and statistical efficiency.]
 
 ```{r}
 # multiple imputation
@@ -434,18 +439,21 @@ imp0
 
 # modify the imputation method of 'hgt'
 imp0$method["hgt"] <- "norm"
+# restrict the support of 'hgt'
+imp0$post["hgt"] <- "imp[[j]][,i] <- squeeze(imp[[j]][,i], c(0.5, 2.8))"
 ```
 ```{r}
-# MI for m = {5, 10, 20} with seed = {1, 2, 3}
+# MI for m = {5, 10, 20} with seed = {1, 2, 3, 4, 5, 6}
 m.set <- c(5, 10, 15, 20, 25)
-seed.set <- c(1, 2, 3)
+seed.set <- c(1, 2, 3, 4, 5 ,6)
 
 for (i in m.set){
   est.df <- NULL
   for (j in seed.set){
     time.start <- Sys.time()
-    imp.q5 <- mice(NHANES2, maxit = 20, m = i, seed = j, 
-                   method = imp0$method, printFlag = FALSE)
+    imp.q5 <- mice(NHANES2, maxit = 20, m = i, seed = j,
+                   method = imp0$method,
+                   post = imp0$post, printFlag = FALSE)
     fit.q5 <- with(imp.q5, lm(wgt ~ gender + age + hgt + WC))
     pool.q5 <- pool(fit.q5)
     time.end <- Sys.time()
@@ -464,10 +472,29 @@ for (i in m.set){
 ```{r}
 # MI with m = 20 and seed = 1
 imp.q5 <- mice(NHANES2, maxit = 20, m = 20, seed = 1, 
-               method = imp0$method, printFlag = FALSE)
+               method = imp0$method, 
+               post = imp0$post, printFlag = FALSE)
 fit.q5 <- with(imp.q5, lm(wgt ~ gender + age + hgt + WC))
 pool.q5 <- pool(fit.q5)
 ```
+
+\newpage
+
+***Imputation Check***
+
+After applying a multiple imputation with proper arguments to our data, we conduct necessary checks. 
+
+We first check if `mice()` found any problems during imputation with object `loggedEvents` and obtain the result `NULL`, indicating no problems detected. Furthermore, we check the Monte Carlo chains to ensure the convergence across all 12 variables. From the plots with $20$ MC chains for each variable, the there exists no obvious pattern among chains, suggesting good convergence for all variables. Note that the plot for the standard deviation of `educ` is blank as there is only $1$ missing values in this column.
+
+Next, we inspect if the distribution of the imputed values agree with the distribution of the observed values, using `densityplot()` as well as `bwplot() ` functions from `mice` package for continuous variables and [`propplot()` function](https://gist.githubusercontent.com/NErler/0d00375da460dd33839b98faeee2fdab/raw/c6f537ecf80eddcefd94992ec7926aa57d454536/propplot.R) for categorical variables.
+
+For continuous variables, except `hgt`, comparing with the distribution of their observed values ($\color{blue}{blue}$), their imputed values follow the similar distribution ($\color{red}{red}$). On the other hand, we can observe a clear left-shifted distribution of the imputed values of `hgt`. 
+
+Recall that we observed high correlation between `hgt` and `gender` from the heat map. We guess this is the main reason for the shifted distribution of imputed `hgt`. To prove this, we next make a density plot of `hgt`, conditional on `gender`. As a result, we observe that `gender`  does strongly influences 
+the imputed datasets. Specifically, values in `male` group has much more
+narrow, concentrated distributions while the distribution in `female` group is wider.
+
+For categorical variables, the distribution of imputed values of `educ` appears to be abnormal simply because we only imputed $1$ value each time. The same reason can also explain the  discrepancies between the observed and imputed values for `hypten`.
 
 ```{r, fig.height = 5}
 # necessary checks for mice() procedure 
@@ -477,7 +504,7 @@ imp.q5$loggedEvents
 plot(imp.q5, layout = c(2, 8))
 ```
 
-```{r, fig.height = 5}
+```{r, fig.height = 3.5}
 # distribution check
 # case for continuous variables
 bwplot(imp.q5)[c(2, 4, 5, 6, 7, 8)]
@@ -485,10 +512,25 @@ densityplot(imp.q5)
 # distribution of hgt conditional on gender
 densityplot(imp.q5, ~ hgt | gender)
 ```
-```{r, warning = FALSE, fig.height = 5}
+```{r, warning = FALSE, fig.height = 3.5}
 # case for categorised variables
 propplot(imp.q5)
 ```
+
+\newpage
+
+***Regression Check***
+
+Before we reach the final conclusions, we also need to check if our model of interest fits well the \emph{completed} data. Moreover, we check if model performances across different subsets are consistent. Thus, we display the regression summaries for both subset $1$ and $20$ with plots.
+
+According to the regression summaries, we observe that all independent variables, except `genderfemale` (`gender`), are significant with relatively low p-values. Moreover, $R^2$ around $85$ indicates good model explanation on response variable. Looking at the residual plots, we cannot observe obvious pattern of residuals, suggesting the linear assumption is met. The well-performed normal Q-Q plots shows the normality of error terms is satisfied. Thus, we consider our model to be well fitted.
+
+Note that the insignificance of `genderfemale` (`gender`) mainly because its high correlation with `hgt`. High correlation indicates there exists high collinearity between two variables, where one covers most information of the other. As a result, one variable becomes insignificant when including both of them into regression model. 
+
+The strong linear relationship between two variables influence not only the distribution of imputed values of `hgt`, but also the contribution to `wgt` of `gender`. Though the regression model appears to be good, we still need to focus on solving this problem in future research to improve model performance.
+
+Finally we pool the regression results and report the estimates of regression coefficients with their $95\%$ confidence intervals and p-values.
+
 ```{r}
 # with() procedure (regression) check
 summary(fit.q5$analyses[[1]])
@@ -514,7 +556,7 @@ df <- data.frame(estimate = summary.q5[, 2],
                                "$\\beta_2$", "$\\beta_3$", "$\\beta_4$"))
 colnames(df) <- c("estimate", "2.5% quantile", "97.5% quantile", "p-value")
 knitr::kable(df, escape = FALSE, digits = 3, 
-             caption = "Regression coefficients, 95% confidence intervals and p-values")
+             caption = "Regression coefficients, 95% CIs and p-values")
 ```
 
 
