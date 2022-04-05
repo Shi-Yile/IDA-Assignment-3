@@ -49,7 +49,7 @@ Then we obtain the \textbf{total variance} $V^{MI} = \overline{U} + \bigg(1 + \f
 
 According to the work by [Buuren et al. 2011](https://www.jstatsoft.org/article/view/v045i03), the proportion of total variance that is attributed to the missing values is 
 $$\lambda = \frac{B + \frac{B}{M}}{V^{MI}}$$
-We yield the following results with the standard MICE procedure - `mice()`, `with()` and `pool()`. Note that in step 2 (`with()`), we fit the normal linear regression of `bmi` over `age`, `hyp` and `cyl`. 
+We yield the following results with the standard MICE procedure - `mice()`, `with()` and `pool()`. Note that in step 2 (`with()`), we fit the normal linear regression of `bmi` over `age`, `hyp` and `chl`. 
 
 As mentioned before, we look at the column `lambda` to get the proportion of variance due to missing data for each parameter (3 decimal places, seed = 1):
 
@@ -122,7 +122,7 @@ where $B = \frac{1}{M-1}\sum\limits_{i=1}^{M}\bigg(\hat\theta^{(i)} - \hat\theta
 
 Therefore, large value of $M$ can reduce the values of both $\overline{U}$ and $B$, and further the total variance, increasing the reliability of the estimates. In terms of high accuracy of predictions, larger number of imputed datasets is a better choice. 
 
-However, time consumption and low statistical efficiency can be the problems of large value of $M$. When imputing large scaled dataset with a large number of missing values, large $M$ will relatively increase the running time. Moreover, the imputation procedure arrives at stable and statistically significant conclusions when $M$ reaches a certain value. Increasing $M$ beyond this value does not significantly influence the conclusions but consumes resource and time.
+However, time consumption and low statistical efficiency can be the problems of large value of $M$. When imputing large scaled dataset with a large number of missing values, large $M$ will relatively increase the running time. Moreover, the imputation procedure arrives at stable and statistically significant conclusions when $M$ reaches a certain value. Increasing $M$ beyond this value does not significantly influence the conclusions but consumes memory and time.
 
 Overall, I still consider $M = 100$ as a better choice as the dataset in this question only have 25 observations and $100$ imputed datasets can be easily handled.
 
@@ -217,11 +217,11 @@ $$
             &= \tilde{\beta_0} + \sum\limits_{j = 1}^{n}\tilde{\beta_j}x_j
 \end{aligned}
 $$
-where $\tilde{\beta_0} = \frac{1}{M}\sum\limits_{i = 1}^{M} \beta^{(i)}$ and $\tilde{\beta_j} = \frac{1}{M}\sum\limits_{i = 1}^{M} \beta_j^{(i)}$ are the pooled regression coefficients with intercept. 
+where $\tilde{\beta_0} = \frac{1}{M}\sum\limits_{i = 1}^{M} \beta^{(i)}$ and $\tilde{\beta_j} = \frac{1}{M}\sum\limits_{i = 1}^{M} \beta_j^{(i)}, \ j = 1, \cdots, n$ are the pooled regression coefficients with intercept. 
 
 Now we work on strategy (ii) with same notations used in (i). 
 
-Before predicting, we pool the regression coefficients from each model, i.e. $\pmb{\beta^{(i)}} = \big(\beta_0^{(i)}, \beta_1^{(i)}, \cdots, \beta_n^{(i)}\big),\ i = 1, 2, \cdots, M$ in step $2$ using Rubin's rule for point estimates. In this way, we also obtain $\tilde{\beta_0} = \frac{1}{M}\sum\limits_{i = 1}^{M} \beta^{(i)}$ and $\tilde{\beta_j} = \frac{1}{M}\sum\limits_{i = 1}^{M} \beta_j^{(i)}$ and further the same predicting expression $\tilde{y} = \tilde{\beta_0} + \sum\limits_{j = 1}^{n}\tilde{\beta_j}x_j$ as we derived for strategy (i).
+Before predicting, we pool the regression coefficients from each model, i.e. $\pmb{\beta^{(i)}} = \big(\beta_0^{(i)}, \beta_1^{(i)}, \cdots, \beta_n^{(i)}\big),\ i = 1, 2, \cdots, M$ in step $2$ using Rubin's rule for point estimates. In this way, we also obtain $\tilde{\beta_0} = \frac{1}{M}\sum\limits_{i = 1}^{M} \beta^{(i)}$ and $\tilde{\beta_j} = \frac{1}{M}\sum\limits_{i = 1}^{M} \beta_j^{(i)}, \ j = 1, \cdots, n$ and further the same predicting expression $\tilde{y} = \tilde{\beta_0} + \sum\limits_{j = 1}^{n}\tilde{\beta_j}x_j$ as we derived for strategy (i).
 
 Therefore, the equations above prove that two strategies are mathematically equivalent and lead to same results and conclusions.
 
@@ -240,11 +240,11 @@ According to the `pool()` procedure, we obtain the estimates and $95\%$ confiden
   \item $\hat{\beta_3} = 0.755\ \ 95\%CI = (0.642, 0.868)$
 \end{enumerate}
 
-Comparing the results above with the ground truth values ($\beta_1 = 1, \beta_2 = 2, \beta_3 = 1$), we observe that only the $95\%$ confidence interval corresponding to $\beta_2$ covers its true value, with a reasonable estimate. 
+Comparing the results above with the ground truth values ($\beta_1 = 1, \beta_2 = 2, \beta_3 = 1$), we observe that only the $95\%$ confidence interval corresponding to $\beta_2$, the coefficient of complete column $x_2$, covers its true value, with a reasonable estimate. 
 
 On the other hand, the estimates for imputed variables, $y$ and $x_1$, are relatively inaccurate and the corresponding $95\%$ confidence intervals fail to cover their true values. 
 
-Based on these. we consider that the \emph{impute and then transform} method leads to biased estimates for imputed variables.
+Based on these, we consider that the \emph{impute and then transform} method leads to biased estimates for imputed variables.
 
 ```{r}
 # read dataset into R
@@ -425,9 +425,9 @@ For factors, the methods are different depending on the number of classes in the
 
 Before any further imputation checks, we determine a proper number of imputed datasets, i.e. `m` argument in `mice()` function, based on both accuracy and statistical efficiency. To this end, we run complete multiple imputation procedures including `mice()`, `with()` and `pool()` with a set of candidates of $\texttt{m} \in \{5, 10, 15, 20, 25\}$ and repeat the procedures for $\texttt{seed} \in  \{1, 2, 3, 4, 5, 6\}$. We report the estimates for the regression coefficients as well as the running time using different seed for each candidate of `m`. 
 
-As the data frames shown below, the variance of estimated regression coefficients gets smaller as `m` increases. However, this improvement becomes insignificant from $\texttt{m}=20$ to $\texttt{m}=25$. Meanwhile, we notice that the running time of each multiple imputation increases by around 10 seconds as the value of `m` increases by $5$ ($50$ seconds for $\texttt{m}=25). 
+As the data frames shown below, the variance of estimated regression coefficients gets smaller as `m` increases. However, this improvement becomes insignificant from $\texttt{m}=20$ to $\texttt{m}=25$. Meanwhile, we notice that the running time of each multiple imputation increases by around 10 seconds as the value of `m` increases by $5$ ($50$ seconds for $\texttt{m}=25$). 
 
-Therefore, we prefer a multiple imputation on our dataset with $\texttt{m}=20$, which obtains both computationally efficient and robust to random variation due to seed choice. Meanwhile, we set `maxit` argument to $20$ and keep random seed as $1$ for model reproducibility, without the loss of generality.
+Therefore, we prefer a multiple imputation on our dataset with $\texttt{m}=20$, which obtains both computationally efficiency and robust to random variation due to seed choice. Meanwhile, we set `maxit` argument to $20$ and keep random seed as $1$ for model reproducibility, without the loss of generality.
 
 [\textbf{Note:} There is no doubt to use larger value of $m$ (e.g. $50$, $100$) to improve the model accuracy. However, in this case, the percentage of missing values in each variable is low ($9.4\%$ for `bili` at most) and over $80\%$ cases in the dataset are complete. Thus, we believe smaller $m$ can satisfy the requirements of both less variation and statistical efficiency.]
 
@@ -443,7 +443,7 @@ imp0$method["hgt"] <- "norm"
 imp0$post["hgt"] <- "imp[[j]][,i] <- squeeze(imp[[j]][,i], c(0.5, 2.8))"
 ```
 ```{r}
-# MI for m = {5, 10, 20} with seed = {1, 2, 3, 4, 5, 6}
+# MI for m = {5, 10, 15, 20, 25} with seed = {1, 2, 3, 4, 5, 6}
 m.set <- c(5, 10, 15, 20, 25)
 seed.set <- c(1, 2, 3, 4, 5 ,6)
 
@@ -478,6 +478,8 @@ fit.q5 <- with(imp.q5, lm(wgt ~ gender + age + hgt + WC))
 pool.q5 <- pool(fit.q5)
 ```
 
+(The imputation check continues in the next page.)
+
 \newpage
 
 ***Imputation Check***
@@ -494,7 +496,7 @@ Recall that we observed high correlation between `hgt` and `gender` from the hea
 the imputed datasets. Specifically, values in `male` group has much more
 narrow, concentrated distributions while the distribution in `female` group is wider.
 
-For categorical variables, the distribution of imputed values of `educ` appears to be abnormal simply because we only imputed quite a few values each time, specifically $1$. The similar reason can also explain the discrepancies between the observed and imputed values for `hypten`.
+For categorical variables, the distribution of imputed values of `educ` appears to be abnormal simply because we only imputed quite a few values each time, specifically $1$. The similar reason can also explain the discrepancies between the observed and imputed values for `hypten` (the percentage of missing values in this column is $4.2\%$). 
 
 ```{r, fig.height = 5}
 # necessary checks for mice() procedure 
@@ -517,11 +519,13 @@ densityplot(imp.q5, ~ hgt | gender)
 propplot(imp.q5)
 ```
 
+(The regression check and conclusions continue in the next page.)
+
 \newpage
 
 ***Regression Check***
 
-We have confirmed that our imputation step is ssuccessful. Before we reach the final conclusions, we also need to check if our model of interest fits well the \emph{completed} data. Moreover, we check if model performances across different subsets are consistent. Thus, we display the regression summaries for both subset $1$ and $20$ with plots.
+We have confirmed that our imputation step is successful. Before we reach the final conclusions, we also need to check if our model of interest fits well the \emph{completed} data. Moreover, we check if model performances across different subsets are consistent. Thus, we display the regression summaries for both subset $1$ and $20$ with plots.
 
 According to the regression summaries, we observe that all independent variables, except `genderfemale` (`gender`), are significant with relatively low p-values. Moreover, $R^2$ around $85$ indicates good model explanation on response variable. Looking at the residual plots, we cannot observe obvious pattern of residuals, suggesting the linear assumption is met. The well-performed normal Q-Q plots shows the normality of error terms is satisfied. Thus, we consider our model to be well fitted.
 
@@ -529,7 +533,9 @@ The insignificance of `genderfemale` (`gender`) is also confirmed by implementin
 
 Recall that there is a strong linear relationship between `gender` and `hgt`, which influences the distribution of imputed values of `hgt`. Here, we may also consider it as a reason for the insignificant contribution of `gender`. Though the regression model appears to be good, we still need to solve this problem in future research to improve model performance. A easy and reasonable way is to drop `gender` from the model.
 
-Since the results from different subsets are similar, we consider our models are consistent across subsets. Therefore, we finally pool the regression results and report the estimates of regression coefficients with their $95\%$ confidence intervals and p-values. As expected, the coefficient of `gender` is insignificant. Moreover, we report the pooled adjusted $R^2$, where the value of around $0.85$ indicates good model explanation.
+Since the results from different subsets are similar, we consider our models are consistent across subsets. Therefore, we finally pool the regression results and report the estimates of regression coefficients with their $95\%$ confidence intervals and p-values. The regression expression is:
+$$ wgt = -100.960 - 1.324 \times genderfemale - 0.156 \times age + 52.498 \times hgt + 1.025 \times WC $$
+As expected, the coefficient of `gender` is insignificant. Moreover, we report the pooled adjusted $R^2$, where the value of around $0.85$ indicates good model explanation.
 
 ```{r}
 # with() procedure (regression) check
