@@ -49,19 +49,25 @@ Then we obtain the \textbf{total variance} $V^{MI} = \overline{U} + \bigg(1 + \f
 
 According to the work by [Buuren et al. 2011](https://www.jstatsoft.org/article/view/v045i03), the proportion of total variance that is attributed to the missing values is 
 $$\lambda = \frac{B + \frac{B}{M}}{V^{MI}}$$
-We yield the following results with the standard MICE procedure - `mice()`, `with()` and `pool()`. Note that in step 2 (`with()`), we fit the normal linear regression of `bmi` over `age`, `hyp` and `chl`. 
+We notice that `age` and `hyp` in our data are categorical variables hence we assign them as factors. Then we yield the following results with the standard MICE procedure - `mice()`, `with()` and `pool()`. Note that in step 2 (`with()`), we fit the normal linear regression of `bmi` over `age`, `hyp` and `chl`. 
 
 As mentioned before, we look at the column `lambda` to get the proportion of variance due to missing data for each parameter (3 decimal places, seed = 1):
 
 \begin{enumerate}
-  \item $\lambda_{age} = 0.686$
-  \item $\lambda_{hyp} = 0.350$
-  \item $\lambda_{chl} = 0.304$
+  \item $\lambda_{intercept} = 0.323$
+  \item $\lambda_{age2} = 0.611$
+  \item $\lambda_{age3} = 0.603$
+  \item $\lambda_{hyp2} = 0.264$
+  \item $\lambda_{chl} = 0.452$
 \end{enumerate}
 
-Based on the proportion of variance due to missing data, we conclude that `age` appears to be the most affected by the non-response with the largest value of $\lambda$.
+We observe that generally `age` factors have higher $\lambda$ values than others, where `age2`has the largest $\lambda$ of $0.611$. Note that the intercept includes `age1` and `hyp1` as baseline level, with the $\lambda$ value of $0.232$.  In conclusion, we consider `age` to be most affected by the non-response.
 
 ```{r}
+# convert age and hyp to factors
+nhanes$age <- as.factor(nhanes$age)
+nhanes$hyp <- as.factor(nhanes$hyp)
+
 # impute dataset with mice
 imp.list <- mice(nhanes, printFlag = FALSE, seed = 1)
 
@@ -70,7 +76,7 @@ bmi.fit <- with(imp.list, lm(bmi ~ age + hyp + chl))
 
 # pool the results
 bmi.pool <- pool(bmi.fit)
-bmi.pool$pooled
+bmi.pool$pooled[, c(1, 3, 10)]
 ```
 
 \newpage
@@ -81,24 +87,32 @@ We repeat same analysis on $\lambda$ by using different random seeds from $2$ to
 
 We can observe that the conclusions in 1.(b) do not remain the same for different seeds. The values of $\lambda$ and the parameter most affected by the non-response vary dramatically.
 
-For seed $2$, $3$ and $6$, `age` has the largest value of $\lambda$ ($0.403$, $0.590$, $0.655$ of each, 3 decimal places) and is considered to be most affected by the non-response, which is consistent with conclusions in 1.(b), using random seed $1$. On the other hand, `chl` and `hyp` take the largest proportion of variance for seed $4$ and $5$ respectively, with values $0.331$ and $0.594$ of each. 
+For seed $3$, $4$ and $6$, `age` is considered to be most affected by the non-response, which is consistent with conclusions in 1.(b), using random seed $1$. Specifically, `age2` takes the largest $\lambda$ value $0.3075109$ for random seed $6$ and `age3` takes the largest $\lambda$ values $0.5147210$ and $0.5590423$ for seed $3$ and $4$ respectively.
+
+On the other hand, `chl` takes the largest proportion of variance for seed $2$ and $5$, with values $0.5424351$ and $0.5294706$ of each. 
 
 Recall that the larger amount of missing data, the larger the variability of values of $\lambda$ will be. Since nearly half ($48\%$) of cases in the dataset are incomplete, it is reasonable to have different conclusions every time we adjust the random seed.
 
 ```{r}
 # create a data frame to store the results from different seeds
-bmi.lambda <- data.frame(seed = 1, age = bmi.pool$pooled[2, 10],
-                         hyp = bmi.pool$pooled[3, 10],
-                         chl = bmi.pool$pooled[4, 10])
+bmi.lambda <- data.frame(seed = 1, 
+                         intercept = bmi.pool$pooled[1, 10],
+                         age2 = bmi.pool$pooled[2, 10],
+                         age3 = bmi.pool$pooled[3, 10],
+                         hyp2 = bmi.pool$pooled[4, 10],
+                         chl = bmi.pool$pooled[5, 10])
 
 # repeat analysis with different seeds
 for (i in seq(2, 6)){
   imp.list <- mice(nhanes, printFlag = FALSE, seed = i)
   bmi.fit <- with(imp.list, lm(bmi ~ age + hyp + chl))
   bmi.pool <- pool(bmi.fit)
-  df <- data.frame(seed = i, age = bmi.pool$pooled[2, 10],
-                   hyp = bmi.pool$pooled[3, 10],
-                   chl = bmi.pool$pooled[4, 10])
+  df <- data.frame(seed = i, 
+                   intercept = bmi.pool$pooled[1, 10],
+                   age2 = bmi.pool$pooled[2, 10],
+                   age3 = bmi.pool$pooled[3, 10],
+                   hyp2 = bmi.pool$pooled[4, 10],
+                   chl = bmi.pool$pooled[5, 10])
   bmi.lambda <- rbind(bmi.lambda, df)
 }
 bmi.lambda
@@ -112,7 +126,7 @@ From 1.(c), we observe that the parameter most affected by the non-response vari
 
 We keep using same random seeds from $1$ to $6$, but change the number of imputed datasets, $M$, from $5$ to $100$. Again, we obtain a data frame with values of $\lambda$ for each parameter with different random seed.
 
-Now we can find that `age` always takes the largest proportion of variance due to missing cases (largest value of $\lambda$) in $5$ of $6$ seeds. For seed $3$, `chl` becomes the parameter which is affected by the non-response, with $\lambda = 0.328$. It appears that the conclusions become more consistent with $M = 100$, as we expected.
+Now we can find that `age` factors always take the largest proportion of variance due to missing cases (largest value of $\lambda$) for all $6$ seeds. To be more specific, `age2` is most affected by non-response for seed $4$ and $5$, with $\lambda$ values of $0.3623307$ and $0.3084504$ and in other cases `age3` has the largest $\lambda$ values. It appears that the conclusions become more consistent with $M = 100$, as we expected.
 
 As far as I am concerned, I prefer the analyses with $M = 100$. 
 
@@ -134,9 +148,12 @@ for (i in seq(1, 6)){
   imp.list <- mice(nhanes, m = 100, printFlag = FALSE, seed = i) 
   bmi.fit <- with(imp.list, lm(bmi ~ age + hyp + chl))
   bmi.pool <- pool(bmi.fit)
-  df <- data.frame(seed = i, age = bmi.pool$pooled[2, 10],
-                   hyp = bmi.pool$pooled[3, 10],
-                   chl = bmi.pool$pooled[4, 10])
+  df <- data.frame(seed = i, 
+                   intercept = bmi.pool$pooled[1, 10],
+                   age2 = bmi.pool$pooled[2, 10],
+                   age3 = bmi.pool$pooled[3, 10],
+                   hyp2 = bmi.pool$pooled[4, 10],
+                   chl = bmi.pool$pooled[5, 10])
   bmi.lambda.100 <- rbind(bmi.lambda.100, df)
 }
 bmi.lambda.100
